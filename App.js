@@ -32,17 +32,21 @@ const Page1 = ({ navigation, route }) => {
   useEffect(() => {
     if (noteTitle && noteBody) {
       const newNote = {
-        title: noteTitle,
-        body: noteBody,
+        noteTitle: noteTitle,
+        noteBody: noteBody,
       };
       setNotes((prevNotes) => [...prevNotes, newNote]);
     }
   }, [noteTitle, noteBody]);
 
   const renderItem = ({ item }) => (
-    <Pressable style={styles.pressableNote} onPress={() => navigation.navigate("Page3")}>
+    <Pressable style={styles.pressableNote} onPress={() => navigation.navigate("Page3", {
+      noteTitle: item.noteTitle,
+      noteBody: item.noteBody,
+    })
+    }>
       <Text style={styles.noteTitle}>
-        {item.title}
+        {item.noteTitle}
       </Text>
     </Pressable>
   );
@@ -69,12 +73,12 @@ const Page2 = ({ navigation, route }) => {
 
   const saveEditedNote = () => {
     const newNote = {
-      title: editedTitle,
-      body: editedBody,
+      noteTitle: editedTitle,
+      noteBody: editedBody,
     };
     navigation.navigate("Page1", {
-      noteTitle: newNote.title,
-      noteBody: newNote.body,
+      noteTitle: newNote.noteTitle,
+      noteBody: newNote.noteBody,
     });
   };
 
@@ -105,14 +109,16 @@ const Page3 = ({ navigation, route }) => {
 
   return (
     <View style={styles.containerPage2}>
-      <TextInput style={styles.inputfieldTitle} value={noteTitle} />
+      <TextInput style={styles.inputfieldTitle} value={noteTitle} editable={false}/>
       <TextInput
         style={styles.inputfieldBody}
         value={noteBody}
         multiline={true}
         numberOfLines={4}
+        editable={false}
       />
-      <Button title="Back" onPress={navigation.navigate("Page1")} />
+      <Button title="Back" onPress={() => navigation.navigate("Page1")} />
+
     </View>
   );
 };
