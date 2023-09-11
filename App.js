@@ -8,60 +8,74 @@ import {
   Pressable,
   FlatList,
 } from "react-native";
+import { app, database } from "./firebase";
+import {
+  collection,
+  addDoc,
+  deleteDoc,
+  doc,
+  updateDoc,
+  getDoc,
+} from "firebase/firestore";
 import { NavigationContainer } from "@react-navigation/native"; // npm install @react-navigation/native
 import { createNativeStackNavigator } from "@react-navigation/native-stack"; // npm install @react-navigation/native-stack
+import { useCollection, useCollections } from "react-firebase-hooks/firestore";
 
 export default function App() {
   const Stack = createNativeStackNavigator();
 
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Page1">
-        <Stack.Screen name="Page1" component={Page1} />
-        <Stack.Screen name="Page2" component={Page2} />
-        <Stack.Screen name="Page3" component={Page3} />
+      <Stack.Navigator initialRouteName="Notes">
+        <Stack.Screen name="Notes" component={Page1} />
+        <Stack.Screen name="New note" component={Page2} />
+        <Stack.Screen name="Edit note" component={Page3} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
 
 const Page1 = ({ navigation, route }) => {
-  const [notes, setNotes] = useState([]);
-  const { noteTitle, noteBody } = route.params ?? {};
+  const [values, loading, error] = useCollection(collection(database, "notes"));
+  const data = values?.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
 
-  useEffect(() => {
-    if (noteTitle && noteBody) {
-      const newNote = {
-        noteTitle: noteTitle,
-        noteBody: noteBody,
-      };
-      setNotes((prevNotes) => [...prevNotes, newNote]);
-    }
-  }, [noteTitle, noteBody]);
-
-  const renderItem = ({ item }) => (
-    <Pressable style={styles.pressableNote} onPress={() => navigation.navigate("Page3", {
-      noteTitle: item.noteTitle,
-      noteBody: item.noteBody,
-    })
-    }>
-      <Text style={styles.noteTitle}>
-        {item.noteTitle}
-      </Text>
-    </Pressable>
-  );
-  
+  async function deleteDocument(id) {
+    await deleteDoc(doc(database, "notes", id));
+  }
 
   return (
     <View style={styles.container}>
       <Button
         title="Add new note"
-        onPress={() => navigation.navigate("Page2")}
+        onPress={() => navigation.navigate("New note")}
       />
       <FlatList
-        data={notes}
-        renderItem={renderItem}
-        keyExtractor={(item, index) => index.toString()}
+        data={data}
+        renderItem={(note) => (
+          <Pressable style={styles.pressableNote}>
+            <View style={styles.itemWithDelete}>
+              <View style={styles.container}>
+                <Text style={styles.noteTitle}>{note.item.title}</Text>
+              </View>
+              <View style={styles.deleteAndUpdate}>
+                <Button
+                  title="update"
+                  onPress={() =>
+                    navigation.navigate("Edit note", {title: note.item.title, text: note.item.text, id: note.item.id })
+                  }
+                >
+                  {" "}
+                </Button>
+                <Button
+                  title="Delete"
+                  onPress={() => deleteDocument(note.item.id)}
+                >
+                  {" "}
+                </Button>
+              </View>
+            </View>
+          </Pressable>
+        )}
       />
     </View>
   );
@@ -71,16 +85,17 @@ const Page2 = ({ navigation, route }) => {
   const [editedTitle, setEditedTitle] = useState("");
   const [editedBody, setEditedBody] = useState("");
 
-  const saveEditedNote = () => {
-    const newNote = {
-      noteTitle: editedTitle,
-      noteBody: editedBody,
-    };
-    navigation.navigate("Page1", {
-      noteTitle: newNote.noteTitle,
-      noteBody: newNote.noteBody,
-    });
-  };
+  async function saveOnFirebase() {
+    try {
+      await addDoc(collection(database, "notes"), {
+        title: editedTitle,
+        text: editedBody,
+      });
+    } catch (err) {
+      console.log(err);
+    }
+    navigation.navigate("Notes");
+  }
 
   return (
     <View style={styles.containerPage2}>
@@ -99,27 +114,54 @@ const Page2 = ({ navigation, route }) => {
         multiline={true}
         numberOfLines={4}
       />
-      <Button title="Save" onPress={saveEditedNote} />
+      <Button title="Save" onPress={saveOnFirebase} />
     </View>
   );
 };
 
+
 const Page3 = ({ navigation, route }) => {
-  const { noteTitle, noteBody } = route.params ?? {};
+
+  const [updatedText, setUpdatedText] = useState(noteText);
+  const [updatedTitle, setUpdatedTitle] = useState(noteTitle);
+
+  const noteTitle = route.params.title
+  const noteText = route.params.text
+  const id = route.params.id
+
+  async function updateMyDoc() {
+    await updateDoc(doc(database, "notes", id ), {
+      text: updatedText,
+      title: updatedTitle
+      
+    })
+  }
 
   return (
     <View style={styles.containerPage2}>
-      <TextInput style={styles.inputfieldTitle} value={noteTitle} editable={false}/>
+      <TextInput
+        style={styles.inputfieldTitle}
+        defaultValue= {noteTitle} 
+        onChangeText={ (txt) => setUpdatedTitle(txt)}
+      />
       <TextInput
         style={styles.inputfieldBody}
-        value={noteBody}
         multiline={true}
+        onChangeText={ (txt) => setUpdatedText(txt)}
+        defaultValue= {noteText}
         numberOfLines={4}
-        editable={false}
       />
-      <Button title="Back" onPress={() => navigation.navigate("Page1")} />
+      <Button title="update" onPress={() =>{ 
+        updateMyDoc()
+
+        navigation.navigate("Notes")
+        }}/>
+        <Text style={{margin: 5, color: "red"}} onPress={() =>{
+        navigation.navigate("Notes")
+        }}> Cancel </Text>
 
     </View>
+    
   );
 };
 
@@ -173,5 +215,16 @@ const styles = StyleSheet.create({
     width: "80%",
     marginBottom: 15,
     height: 300,
+  },
+  itemWithDelete: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 5,
+  },
+  deleteAndUpdate: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-evenly",
   },
 });
