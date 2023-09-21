@@ -7,6 +7,7 @@ import {
   Button,
   Pressable,
   FlatList,
+  Image,
 } from "react-native";
 import { app, database } from "./firebase";
 import {
@@ -20,6 +21,9 @@ import {
 import { NavigationContainer } from "@react-navigation/native"; // npm install @react-navigation/native
 import { createNativeStackNavigator } from "@react-navigation/native-stack"; // npm install @react-navigation/native-stack
 import { useCollection, useCollections } from "react-firebase-hooks/firestore";
+import * as ImagePicker from 'expo-image-picker'
+import { storage } from './firebase'
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 
 export default function App() {
   const Stack = createNativeStackNavigator();
@@ -61,7 +65,11 @@ const Page1 = ({ navigation, route }) => {
                 <Button
                   title="update"
                   onPress={() =>
-                    navigation.navigate("Edit note", {title: note.item.title, text: note.item.text, id: note.item.id })
+                    navigation.navigate("Edit note", {
+                      title: note.item.title,
+                      text: note.item.text,
+                      id: note.item.id,
+                    })
                   }
                 >
                   {" "}
@@ -82,14 +90,14 @@ const Page1 = ({ navigation, route }) => {
 };
 
 const Page2 = ({ navigation, route }) => {
-  const [editedTitle, setEditedTitle] = useState("");
-  const [editedBody, setEditedBody] = useState("");
+  const [noteTitle, setNoteTitle] = useState("");
+  const [noteBody, setNoteBody] = useState("");
 
   async function saveOnFirebase() {
     try {
       await addDoc(collection(database, "notes"), {
-        title: editedTitle,
-        text: editedBody,
+        title: noteTitle,
+        text: noteBody,
       });
     } catch (err) {
       console.log(err);
@@ -103,13 +111,13 @@ const Page2 = ({ navigation, route }) => {
       <TextInput
         style={styles.inputfieldTitle}
         placeholder="Title"
-        onChangeText={(txt) => setEditedTitle(txt)}
+        onChangeText={(txt) => setNoteTitle(txt)}
         value={editedTitle}
       />
       <TextInput
         style={styles.inputfieldBody}
         placeholder="Note Content"
-        onChangeText={(txt) => setEditedBody(txt)}
+        onChangeText={(txt) => setNoteBody(txt)}
         value={editedBody}
         multiline={true}
         numberOfLines={4}
@@ -119,49 +127,75 @@ const Page2 = ({ navigation, route }) => {
   );
 };
 
-
 const Page3 = ({ navigation, route }) => {
-
   const [updatedText, setUpdatedText] = useState(noteText);
   const [updatedTitle, setUpdatedTitle] = useState(noteTitle);
+  const [imagePath, setImagePath] = useState(null)
 
-  const noteTitle = route.params.title
-  const noteText = route.params.text
-  const id = route.params.id
+  const noteTitle = route.params.title;
+  const noteText = route.params.text;
+  const id = route.params.id;
+
+
+  async function launchImagePicker() {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true
+    })
+    if(!result.canceled) {
+      setImagePath(result.assets[0].uri)
+    }
+  }
+
+  useEffect(() => {
+    getDownloadURL(ref(storage, id + ".jpg"))
+      .then((url) => {
+        setImagePath(url);
+      })
+      .catch((err) => alert("error: " + err));
+  }, [id]);
+
+  async function uploadImage() {
+    const res = await fetch(imagePath)
+    const blob = await res.blob()
+    const storageRef = ref(storage, id+".jpg")
+    uploadBytes(storageRef, blob)
+  }
 
   async function updateMyDoc() {
-    await updateDoc(doc(database, "notes", id ), {
+    await uploadImage()
+    await updateDoc(doc(database, "notes", id), {
       text: updatedText,
-      title: updatedTitle
-      
-    })
+      title: updatedTitle,
+    });
   }
 
   return (
     <View style={styles.containerPage2}>
+        <Image style={{height: 200, width: 200, margin: 5}}source={{uri: imagePath}}/>
       <TextInput
         style={styles.inputfieldTitle}
-        defaultValue= {noteTitle} 
-        onChangeText={ (txt) => setUpdatedTitle(txt)}
+        defaultValue={noteTitle}
+        onChangeText={(txt) => setUpdatedTitle(txt)}
       />
       <TextInput
         style={styles.inputfieldBody}
         multiline={true}
-        onChangeText={ (txt) => setUpdatedText(txt)}
-        defaultValue= {noteText}
+        onChangeText={(txt) => setUpdatedText(txt)}
+        defaultValue={noteText}
         numberOfLines={4}
       />
-      <Button title="update" onPress={() =>{ 
-        updateMyDoc()
-
-        navigation.navigate("Notes")
-        }}/>
-        <Text style={{margin: 5, color: "red"}} onPress={() =>{
-        navigation.navigate("Notes")
-        }}> Cancel </Text>
-
+      <Text onPress={launchImagePicker} style={styles.page3Buttons}> pick a new image </Text>
+      <Text style={styles.page3Buttons} onPress={() => {
+          updateMyDoc();
+          navigation.navigate("Notes");
+        }}
+      > update changes</Text>
+      <Text style={styles.page3Buttons} onPress={() => {
+          navigation.navigate("Notes");
+        }}>
+        {" "}Cancel{" "}
+      </Text>
     </View>
-    
   );
 };
 
@@ -204,6 +238,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     width: "80%",
     marginBottom: 15,
+    marginTop: 10
   },
   inputfieldBody: {
     borderColor: "black",
@@ -227,4 +262,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-evenly",
   },
+  page3Buttons: {
+    margin: 5, 
+    color: 'blue',
+    borderWidth: 1,
+    borderColor: 'blue'
+  }
 });
