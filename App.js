@@ -112,17 +112,20 @@ const Page2 = ({ navigation, route }) => {
         style={styles.inputfieldTitle}
         placeholder="Title"
         onChangeText={(txt) => setNoteTitle(txt)}
-        value={editedTitle}
       />
       <TextInput
         style={styles.inputfieldBody}
         placeholder="Note Content"
         onChangeText={(txt) => setNoteBody(txt)}
-        value={editedBody}
         multiline={true}
         numberOfLines={4}
       />
       <Button title="Save" onPress={saveOnFirebase} />
+      <Text style={styles.page3Buttons} onPress={() => {
+          navigation.navigate("Notes");
+        }}>
+        {" "}Cancel{" "}
+      </Text>
     </View>
   );
 };
@@ -147,12 +150,14 @@ const Page3 = ({ navigation, route }) => {
   }
 
   useEffect(() => {
+   
     getDownloadURL(ref(storage, id + ".jpg"))
       .then((url) => {
         setImagePath(url);
       })
-      .catch((err) => alert("error: " + err));
-  }, [id]);
+    ;
+  }, [id])
+;
 
   async function uploadImage() {
     const res = await fetch(imagePath)
